@@ -12,6 +12,11 @@ import (
 	"github.com/google/go-querystring/query"
 )
 
+type basicAuth struct {
+	username string
+	password string
+}
+
 // A Client manages communication with the JIRA API.
 type Client struct {
 	// HTTP client used to communicate with the API.
@@ -23,6 +28,8 @@ type Client struct {
 	// Session storage if the user authentificate with a Session cookie
 	session *Session
 
+	bAuth	basicAuth
+
 	// Services used for talking to different parts of the JIRA API.
 	Authentication *AuthenticationService
 	Issue          *IssueService
@@ -30,7 +37,6 @@ type Client struct {
 	Board          *BoardService
 	Sprint         *SprintService
 	User           *UserService
-	Group          *GroupService
 }
 
 // NewClient returns a new JIRA API client.
@@ -60,9 +66,13 @@ func NewClient(httpClient *http.Client, baseURL string) (*Client, error) {
 	c.Board = &BoardService{client: c}
 	c.Sprint = &SprintService{client: c}
 	c.User = &UserService{client: c}
-	c.Group = &GroupService{client: c}
 
 	return c, nil
+}
+
+func (c *Client) SetBasicAuth(username, password string) {
+	c.bAuth.username = username
+	c.bAuth.password = password
 }
 
 // NewRawRequest creates an API request.
@@ -187,6 +197,9 @@ func (c *Client) NewMultiPartRequest(method, urlStr string, buf *bytes.Buffer) (
 // Do sends an API request and returns the API response.
 // The API response is JSON decoded and stored in the value pointed to by v, or returned as an error if an API error has occurred.
 func (c *Client) Do(req *http.Request, v interface{}) (*Response, error) {
+	if len(c.bAuth.username) > 0 {
+		req.SetBasicAuth(c.bAuth.username, c.bAuth.password)
+	}
 	httpResp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
